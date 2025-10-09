@@ -1,0 +1,43 @@
+version: "3.9"
+
+services:
+  api:
+    build: ./api
+    container_name: api
+    ports:
+      - "8000:8000"
+    networks:
+      - net_rag
+    volumes:
+      - storage:/data
+    depends_on:
+      - orchestrator
+
+  orchestrator:
+    build: ./orchestrator
+    container_name: orchestrator
+    ports:
+      - "8001:8001"
+    networks:
+      - net_rag
+    volumes:
+      - storage:/data
+    depends_on: []
+
+  worker_mcp:
+    build: ./worker_mcp
+    container_name: worker_mcp
+    ports:
+      - "8002:8002"
+    networks:
+      - net_rag
+    volumes:
+      - storage:/data
+    depends_on: []
+
+networks:
+  net_rag:
+    driver: bridge
+
+volumes:
+  storage:
