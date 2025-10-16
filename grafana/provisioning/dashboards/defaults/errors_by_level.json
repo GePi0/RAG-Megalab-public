@@ -1,0 +1,22 @@
+{
+  "uid": "errors-level",
+  "title": "Errors by Level",
+  "panels": [
+    {
+      "type": "piechart",
+      "title": "Logs por nivel",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "level.keyword:*",
+          "bucketAggs": [
+            {"type": "terms", "field": "level.keyword", "id": "1"}
+          ],
+          "metrics": [{"type": "count", "id": "2"}]
+        }
+      ]
+    }
+  ],
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "30s"
+}

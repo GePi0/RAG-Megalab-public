@@ -1,0 +1,62 @@
+name: 🚀 Build & Push Docker images
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+
+    env:
+      REGISTRY: docker.io
+      DOCKER_USER: ${{ secrets.DOCKER_USERNAME }}
+      DOCKER_PASS: ${{ secrets.DOCKER_TOKEN }}
+      NS: ${{ secrets.IMAGE_NAMESPACE }}
+
+    steps:
+      - name: 🧩 Checkout repo
+        uses: actions/checkout@v4
+
+      - name: 🔧 Set version variable
+        id: vars
+        run: |
+          if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            echo "version=${GITHUB_REF_NAME}" >> $GITHUB_OUTPUT
+          else
+            echo "version=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: 🐳 Login to Docker Hub
+        run: echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin $REGISTRY
+
+      - name: 🧠 Build Orchestrator
+        run: |
+          docker build -t $NS-orchestrator:${{ steps.vars.outputs.version }} ./orchestrator
+          docker tag  $NS-orchestrator:${{ steps.vars.outputs.version }} $NS-orchestrator:latest
+
+      - name: 🧠 Build Worker MCP
+        run: |
+          docker build -t $NS-worker_mcp:${{ steps.vars.outputs.version }} ./worker_mcp
+          docker tag  $NS-worker_mcp:${{ steps.vars.outputs.version }} $NS-worker_mcp:latest
+
+      - name: 🧠 Build State Manager
+        run: |
+          docker build -t $NS-state_manager:${{ steps.vars.outputs.version }} ./state_manager
+          docker tag  $NS-state_manager:${{ steps.vars.outputs.version }} $NS-state_manager:latest
+
+      - name: 🚀 Push to Docker Hub
+        run: |
+          docker push $NS-orchestrator:${{ steps.vars.outputs.version }}
+          docker push $NS-worker_mcp:${{ steps.vars.outputs.version }}
+          docker push $NS-state_manager:${{ steps.vars.outputs.version }}
+          docker push $NS-orchestrator:latest
+          docker push $NS-worker_mcp:latest
+          docker push $NS-state_manager:latest

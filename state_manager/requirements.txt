@@ -1,0 +1,14 @@
+# --- Core existentes ---
+kafka-python==2.0.2
+chromadb==0.5.18
+elasticsearch==8.15.0
+
+# --- API cognitiva (FASE 8.1) ---
+fastapi==0.115.4
+uvicorn[standard]==0.32.0
+pydantic==2.9.2
+
+# --- Dependencias invisibles necesarias ---
+requests==2.32.3          # para Elastic y Chroma
+certifi>=2024.8.30        # SSL modern
+typing-extensions>=4.12.2 # compatibilidad pydantic

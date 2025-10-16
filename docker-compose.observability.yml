@@ -1,0 +1,83 @@
+services:
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.15.0
+    container_name: elasticsearch
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    mem_limit: 2g
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    volumes:
+      - ./storage/elasticsearch/data:/usr/share/elasticsearch/data
+    networks:
+      - megalab_net
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    container_name: grafana
+    depends_on:
+      - elasticsearch
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_LOG_MODE=console
+      - GF_LOG_LEVEL=debug
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./storage/grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - megalab_net
+    restart: unless-stopped
+
+  kafka_consumer_ingestor:
+    build: ./kafka_consumer_ingestor
+    container_name: kafka_consumer_ingestor
+    environment:
+      - KAFKA_BROKER=redpanda:9092
+      - KAFKA_TOPIC=rag_logs_v2
+      - ELASTIC_URL=http://elasticsearch:9200
+      - ELASTIC_INDEX=rag_logs_v2
+      - BATCH_SIZE=100
+      - GROUP_ID=elastic_ingestor
+    depends_on:
+      - redpanda
+      - elasticsearch
+    networks:
+      - megalab_net
+    restart: unless-stopped
+
+  state_manager:
+    build: ./state_manager
+    container_name: state_manager
+    environment:
+      - KAFKA_BROKER=redpanda:9092
+      - ELASTIC_URL=http://elasticsearch:9200
+      - ES_INDEX=state_manager_v1
+      - AUTO_OFFSET_RESET=earliest
+      - PYTHONUNBUFFERED=1
+      - CHROMA_TELEMETRY_ENABLED=false
+      - CHROMA_PATH=/app/chroma
+    depends_on:
+      - redpanda
+      - elasticsearch
+    networks:
+      - megalab_net
+    volumes:
+      - ./storage/chroma_state:/app/chroma
+    ports:
+      - "8010:8010"
+    restart: unless-stopped
+
+networks:
+  megalab_net:
+    external: true

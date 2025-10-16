@@ -1,9 +1,11 @@
+# worker_mcp/Dockerfile
 FROM python:3.10-slim
 
 WORKDIR /app
-COPY . /app
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-RUN pip install --no-cache-dir fastapi uvicorn requests
+COPY . .
 
-EXPOSE 8002
+# Uvicorn corre en modo host, no exponer puertos Docker
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8002"]

@@ -1,43 +1,138 @@
-version: "3.9"
-
 services:
-  api:
-    build: ./api
-    container_name: api
-    ports:
-      - "8000:8000"
-    networks:
-      - net_rag
-    volumes:
-      - storage:/data
-    depends_on:
-      - orchestrator
-
   orchestrator:
     build: ./orchestrator
     container_name: orchestrator
+    command: uvicorn main:app --host 0.0.0.0 --port 8001
     ports:
       - "8001:8001"
-    networks:
-      - net_rag
+    environment:
+      - CONTEXT_SERVICE_URL=http://context_service:8002/add
+      - WORKER_URL=http://worker_mcp:8003
+      - KAFKA_BROKER=redpanda:9092
+      - KAFKA_TOPIC=rag_logs_v2
+      - STATE_TOPIC=state_update
+      - LOG_PATH=/storage/logs/orchestrator/events.log
+      - PYTHONUNBUFFERED=1
+      - WORKER_TIMEOUT=60   
     volumes:
-      - storage:/data
-    depends_on: []
+      - ./storage/logs/orchestrator:/storage/logs/orchestrator
+      - ./storage/chroma:/storage/chroma
+    depends_on:
+      - context_service
+      - worker_mcp
+    networks:
+      - megalab_net
+    restart: unless-stopped
+
+  context_service:
+    build: ./context_service
+    container_name: context_service
+    command: uvicorn main:app --host 0.0.0.0 --port 8002
+    ports:
+      - "8002:8002"
+    environment:
+      - CHROMA_DB_PATH=/app/chroma           # persistente
+      - CHROMA_COLLECTION=rag_contexts
+      - EMBEDDING_MODEL=nomic-embed-text
+    volumes:
+      - ./storage/chroma:/app/chroma
+    networks:
+      - megalab_net
+    restart: unless-stopped
 
   worker_mcp:
     build: ./worker_mcp
     container_name: worker_mcp
+    command: uvicorn main:app --host 0.0.0.0 --port 8003
     ports:
-      - "8002:8002"
+      - "8003:8003"
+    environment:
+      - KAFKA_BROKER=redpanda:9092
+      - KAFKA_TOPIC=rag_logs_v2
+      - STATE_TOPIC=state_update
     networks:
-      - net_rag
-    volumes:
-      - storage:/data
-    depends_on: []
+      - megalab_net
+    restart: unless-stopped
 
-networks:
-  net_rag:
-    driver: bridge
+  api:
+    build: ./api
+    container_name: api
+    command: uvicorn main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    environment:
+      - ORCHESTRATOR_URL=http://orchestrator:8001    # 🔹 referenciado por nombre DNS interno
+      - KAFKA_BROKER=redpanda:9092
+      - KAFKA_TOPIC=rag_logs_v2
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      - orchestrator
+    networks:
+      - megalab_net
+    restart: unless-stopped
+
+  redpanda:
+    image: redpandadata/redpanda:v24.2.9
+    container_name: redpanda
+    command:
+      - redpanda start
+      - --overprovisioned
+      - --smp 1
+      - --memory 1G
+      - --node-id 0
+      - --check=false
+      - --set redpanda.enable_transactions=false
+      - --set redpanda.enable_idempotence=false
+      - --advertise-kafka-addr redpanda:9092
+      - --kafka-addr redpanda:9092
+    ports:
+      - "9092:9092"
+      - "9644:9644"
+    volumes:
+      - ./storage/redpanda:/var/lib/redpanda/data
+    networks:
+      - megalab_net
+    restart: unless-stopped
+
+  ollama-service:
+    image: ollama/ollama:latest
+    container_name: ollama-service
+    volumes:
+      - ollama:/root/.ollama   # cache de modelos
+    networks:
+      - megalab_net
+    ports:
+      - "11434:11434"          # expuesto localmente por si quieres probar API
+    restart: unless-stopped
+
+  kafka_consumer:
+    build: ./kafka_consumer
+    container_name: kafka_consumer
+    environment:
+      - KAFKA_BROKER=redpanda:9092
+      - KAFKA_TOPIC=rag_logs_v2
+    depends_on:
+      - redpanda
+    networks:
+      - megalab_net
+    restart: unless-stopped
+
+  context_tester:
+    image: python:3.10-slim
+    container_name: context_tester
+    volumes:
+      - .:/tests
+    working_dir: /tests   
+    command: ["bash", "-c", "pip install --no-cache-dir requests && python context_test.py"]
+    networks:
+      - megalab_net
+    depends_on:
+      - context_service
+      - ollama-service
 
 volumes:
-  storage:
+  ollama:
+
+networks:
+  megalab_net:
+    external: true

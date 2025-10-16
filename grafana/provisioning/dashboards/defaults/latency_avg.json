@@ -1,0 +1,24 @@
+{
+  "uid": "latency-avg",
+  "title": "Latency per Task (avg)",
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Latencia promedio por task_id",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "task_id.keyword:*",
+          "metrics": [
+            {"type": "avg", "field": "extras.latency_ms"}
+          ],
+          "bucketAggs": [
+            {"type": "terms", "field": "task_id.keyword", "id": "1"}
+          ]
+        }
+      ]
+    }
+  ],
+  "time": { "from": "now-1h", "to": "now" },
+  "refresh": "30s"
+}

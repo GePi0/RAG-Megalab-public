@@ -1,0 +1,23 @@
+{
+  "uid": "services-stats",
+  "title": "Service Stats",
+  "panels": [
+    {
+      "type": "barchart",
+      "title": "Eventos por servicio",
+      "targets": [
+        {
+          "refId": "A",
+          "query": "service.keyword:*",
+          "bucketAggs": [
+            {"type": "terms", "field": "service.keyword", "id": "1"},
+            {"type": "terms", "field": "level.keyword", "id": "2"}
+          ],
+          "metrics": [{"type": "count", "id": "3"}]
+        }
+      ]
+    }
+  ],
+  "time": { "from": "now-6h", "to": "now" },
+  "refresh": "30s"
+}
