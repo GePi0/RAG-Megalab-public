@@ -50,6 +50,8 @@ services:
       - KAFKA_BROKER=redpanda:9092
       - KAFKA_TOPIC=rag_logs_v2
       - STATE_TOPIC=state_update
+      - CONTEXT7_URL=http://context7:8080/mcp   # 🧩 añadido
+      - OLLAMA_BASE_URL=http://ollama-service:11434
     networks:
       - megalab_net
     restart: unless-stopped
@@ -129,6 +131,17 @@ services:
     depends_on:
       - context_service
       - ollama-service
+
+  context7:
+    image: mcp/context7:latest
+    container_name: context7
+    ports:
+      - "8099:8080"
+    environment:
+      - LOG_LEVEL=info
+    networks:
+      - megalab_net
+    restart: unless-stopped
 
 volumes:
   ollama:

@@ -8,3 +8,4 @@ ollama==0.3.2
 requests==2.32.3
 chromadb==0.5.18
 kafka-python==2.0.2
+aiohttp>=3.10.3

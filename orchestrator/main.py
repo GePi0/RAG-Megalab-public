@@ -6,6 +6,7 @@ Llama 3.1 y delega tareas al Worker MCP.
 
 🔹 Emite logs estructurados en `rag_logs_v2`
 🔹 Publica eventos cognitivos al topic `state_update`
+🔹 Llama al Supervisor Cognitivo (FASE 8.2)
 ------------------------------------------------------------
 """
 
@@ -17,6 +18,10 @@ from worker_client import send_task_to_worker
 from context_manager import store_context_entry
 from json_logger import log_event
 from state_producer import send_state_update
+
+# 🧠 ➊ Nuevo import: supervisor cognitivo
+import asyncio
+from reasoning_supervisor import run_supervisor
 
 import uuid
 import traceback
@@ -40,6 +45,7 @@ def handle_prompt(body: PromptRequest):
       2️⃣ Ejecuta la cadena de razonamiento (Llama 3.1).
       3️⃣ Delegación de tarea al Worker MCP.
       4️⃣ Persistencia contextual + publicación de estado.
+      5️⃣ Invoca Supervisor cognitivo (FASE 8.2).
     """
     task_id = f"TASK-{uuid.uuid4().hex[:8]}"
 
@@ -109,11 +115,31 @@ def handle_prompt(body: PromptRequest):
         )
         send_state_update(task_id, "context_persisted", "Prompt + respuesta almacenados en memoria")
 
-        # 📦 5️⃣ Finalizar la tarea
+        # 📦 5️⃣ Finalizar la tarea principal
         log_event("orchestrator", "INFO", "task_complete", "Tarea completada sin errores", task_id=task_id)
         send_state_update(task_id, "task_complete", "Tarea completada satisfactoriamente")
 
-        # Respuesta al API Gateway
+        # 🧠 6️⃣ (FASE 8.2a) Invocar Supervisor cognitivo en segundo plano
+        try:
+            # evita bloqueo del hilo principal
+            asyncio.create_task(run_supervisor(task_id, body.prompt))
+            log_event(
+                "orchestrator",
+                "INFO",
+                "supervisor_invoked",
+                f"Supervisor Cognitivo lanzado para {task_id}",
+                task_id=task_id,
+            )
+        except Exception as sup_err:
+            log_event(
+                "orchestrator",
+                "ERROR",
+                "supervisor_error",
+                f"No se pudo invocar supervisor: {sup_err}",
+                task_id=task_id,
+            )
+
+        # === Respuesta al API Gateway ===
         return {
             "task_id": task_id,
             "prompt": body.prompt,
