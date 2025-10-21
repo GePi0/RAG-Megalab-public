@@ -1,0 +1,51 @@
+{
+  "title": "RAG Cognitive Timeline",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "10s",
+  "time": { "from": "now-1h", "to": "now" },
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "RAG Cognitive Timeline",
+      "id": 1,
+      "datasource": { "type": "elasticsearch", "uid": "elastic-default" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": { "drawStyle": "lines", "fillOpacity": 10 }
+        }
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "query": "*",
+          "timeField": "@timestamp",
+          "bucketAggs": [
+            {
+              "id": "1",
+              "type": "terms",
+              "field": "stage.keyword",
+              "settings": { "size": 15, "order": "desc", "orderBy": "_count" }
+            }
+          ],
+          "metrics": [{ "id": "2", "type": "count", "settings": {} }]
+        }
+      ]
+    },
+    {
+      "type": "logs",
+      "title": "Policy Insights — Meta‑Reflections",
+      "id": 2,
+      "datasource": { "type": "elasticsearch", "uid": "elastic-default" },
+      "targets": [
+        {
+          "query": "stage.keyword:meta_reflection",
+          "refId": "A",
+          "timeField": "@timestamp",
+          "metrics": [{ "id": "1", "type": "logs" }]
+        }
+      ]
+    }
+  ]
+}

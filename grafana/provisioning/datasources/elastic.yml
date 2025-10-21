@@ -1,0 +1,15 @@
+apiVersion: 1
+datasources:
+  - name: Elasticsearch
+    uid: elastic-default
+    type: elasticsearch
+    access: proxy
+    url: http://elasticsearch:9200
+    database: state_manager_v1
+    basicAuth: false
+    jsonData:
+      timeField: "@timestamp"
+      logMessageField: "message"
+      logLevelField: "stage"
+      includeFrozen: false
+    isDefault: true
