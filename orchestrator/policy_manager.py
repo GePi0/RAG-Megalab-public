@@ -92,6 +92,7 @@ async def run_meta_reflection():
       - extrae historial reciente desde Elastic
       - analiza con Llama 3.1 por stream NDJSON
       - almacena insight final en Kafka (stage: meta_reflection)
+      - ejecuta feedback adaptativo (ajuste de pesos)
     """
     try:
         history = await fetch_recent_tasks(8)
@@ -103,6 +104,18 @@ async def run_meta_reflection():
         send_state_update("policy", "meta_reflection", reflection or "(vacío)")
         print("🧩 Meta‑reflexión generada:")
         print(reflection[:800] if reflection else "(sin texto)")
+
+        # ============================================================
+        # 🔁  Fase 10 – Policy Feedback Loop (auto‑aprendizaje)
+        # ============================================================
+        try:
+            from policy_feedback import run_policy_feedback
+            print("🧠 Ejecutando feedback cognitivo automático...")
+            run_policy_feedback()
+            print("✅ Feedback Loop completado (ajuste de pesos actualizado).")
+        except Exception as fb_err:
+            print(f"⚠️ Error en feedback cognitivo: {type(fb_err).__name__}: {fb_err}")
+
         return reflection
 
     except Exception as e:

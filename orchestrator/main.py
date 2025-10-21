@@ -1,13 +1,14 @@
 """
 Orchestrator - RAG Megalab
 ------------------------------------------------------------
-Recibe un prompt del usuario, coordina ejecución de Llama 3.1
+Recibe un prompt del usuario, coordina ejecución de Llama 3.1,
 y delega tareas al Worker MCP.
 
 🔹 Emite logs estructurados en Kafka (topic state_update)
 🔹 Persiste contexto en Chroma
 🔹 Ejecuta Supervisor Cognitivo (FASE 8.2)
 🔹 Ejecuta Meta‑Reflexión (FASE 8.3)
+🔹 Ajusta prompts dinámicamente (FASE 9.2 - Prompt Tuner)
 ------------------------------------------------------------
 """
 
@@ -23,6 +24,9 @@ from state_producer import send_state_update
 # 🧠 Módulos cognitivos
 from reasoning_supervisor import run_supervisor
 from policy_manager import run_meta_reflection
+# 🪄 Nuevo: loader de políticas adaptativas
+from policy_adapter import load_adaptive_context
+
 import threading
 import asyncio
 import uuid
@@ -43,11 +47,11 @@ def handle_prompt(body: PromptRequest):
     """
     Flujo principal de ejecución:
       1️⃣ Recibe prompt del usuario.
-      2️⃣ Ejecuta cadena de razonamiento (Llama 3.1).
+      2️⃣ Ejecuta cadena de razonamiento (Llama 3.1 + Ajuste adaptativo).
       3️⃣ Delegación al Worker MCP.
       4️⃣ Persistencia contextual + publicación de estado.
-      5️⃣ Ejecuta Supervisor Cognitivo (8.2).
-      6️⃣ Dispara ciclo Meta‑Reflexivo (8.3).
+      5️⃣ Supervisor Cognitivo (FASE 8.2).
+      6️⃣ Meta‑Reflexión (FASE 8.3).
     """
     task_id = f"TASK-{uuid.uuid4().hex[:8]}"
 
@@ -67,16 +71,34 @@ def handle_prompt(body: PromptRequest):
             metadata={"role": "user", "stage": "prompt_received", "task_id": task_id},
         )
 
-        # ---------------- 2️⃣ Razonamiento Llama 3.1 ------------
-        log_event("orchestrator", "INFO", "llama_invoke", "Ejecutando cadena Llama3.1", task_id=task_id)
-        result = chain.invoke({"prompt": body.prompt})
+        # ---------------- 2️⃣ Razonamiento Llama 3.1 (Adaptativo) ------------
+        log_event(
+            "orchestrator",
+            "INFO",
+            "llama_invoke",
+            "Ejecutando cadena Llama3.1 adaptativo",
+            task_id=task_id,
+        )
+
+        # 🪄 Cargar políticas adaptativas generadas por Policy Adapter
+        adaptive_prefix = load_adaptive_context()
+        if adaptive_prefix:
+            full_prompt = f"{adaptive_prefix}\n\n{body.prompt}"
+        else:
+            full_prompt = body.prompt
+
+        result = chain.invoke({"prompt": full_prompt})
         response_text = (
             result.get("text")
             if isinstance(result, dict)
             else getattr(result, "content", str(result))
         )
 
-        send_state_update(task_id, "llama_result_ok", f"Respuesta de {len(response_text)} caracteres")
+        send_state_update(
+            task_id,
+            "llama_result_ok",
+            f"Respuesta adaptativa de {len(response_text)} caracteres",
+        )
 
         # ----------------- 3️⃣ Worker MCP -----------------
         context = {"origin": "orchestrator", "stage": "delegation"}
@@ -97,7 +119,7 @@ def handle_prompt(body: PromptRequest):
         # ---------------- 5️⃣ Completar tarea principal ----------
         send_state_update(task_id, "task_complete", "Ejecución finalizada correctamente")
 
-        # ---------------- 6️⃣ Supervisor + Meta-Reflexión --------
+        # ---------------- 6️⃣ Supervisor + Meta‑Reflexión --------
         def _run_async_tasks():
             try:
                 loop = asyncio.new_event_loop()
@@ -113,12 +135,17 @@ def handle_prompt(body: PromptRequest):
                 loop.close()
 
         threading.Thread(target=_run_async_tasks, daemon=True).start()
-        send_state_update(task_id, "supervisor_invoked", "Supervisor + Meta‑Reflexión en ejecución")
+        send_state_update(
+            task_id,
+            "supervisor_invoked",
+            "Supervisor + Meta‑Reflexión en ejecución",
+        )
 
-        # ---------------- 7️⃣ Respuesta API Gateway --------------
+        # ---------------- 7️⃣ Respuesta al API Gateway --------------
         return {
             "task_id": task_id,
             "prompt": body.prompt,
+            "adaptive_prefix_applied": bool(adaptive_prefix.strip()),
             "orchestrator_summary": response_text,
             "worker_result": worker_resp.get("result", "(no result)"),
         }

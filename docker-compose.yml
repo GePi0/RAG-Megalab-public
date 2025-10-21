@@ -17,6 +17,7 @@ services:
     volumes:
       - ./storage/logs/orchestrator:/storage/logs/orchestrator
       - ./storage/chroma:/storage/chroma
+      - ./storage/policies:/app/policies
     depends_on:
       - context_service
       - worker_mcp

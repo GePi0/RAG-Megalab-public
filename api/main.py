@@ -53,11 +53,15 @@ async def forward_prompt(request: Request):
 
     t0 = time.time()
     try:
-        async with httpx.AsyncClient(timeout=90.0) as client:
+        async with httpx.AsyncClient(timeout=None) as client:
             r = await client.post(f"{ORCHESTRATOR_URL}/prompt", json=data)
 
         elapsed = round((time.time() - t0) * 1000, 2)
-        response_data = r.json()
+
+        try:
+            response_data = r.json()
+        except Exception:
+            response_data = {"raw_text": r.text[:2000], "note": "fallback_decode"}
 
         return JSONResponse(
             content={
@@ -67,8 +71,16 @@ async def forward_prompt(request: Request):
             status_code=r.status_code,
         )
 
+    except httpx.RequestError as e:
+        return JSONResponse(
+            content={
+                "error": f"API Gateway timeout or network error: {type(e).__name__}",
+                "message": str(e) or "(empty)"
+            },
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+        )
     except Exception as e:
         return JSONResponse(
-            content={"error": str(e)},
+            content={"error": type(e).__name__, "message": str(e)},
             status_code=status.HTTP_502_BAD_GATEWAY,
         )
