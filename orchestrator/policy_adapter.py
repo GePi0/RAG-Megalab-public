@@ -116,3 +116,23 @@ El agente debe evitar:
 El agente debe priorizar:
 {prefer}
 """
+
+# ============================================================
+# 🔹 cada ciclo de auto‑curación actualiza automáticamente la “confianza” del sistema en su capacidad de mantenerse estable.
+# ============================================================
+def modify_weight(key: str, delta: float):
+    """Ajusta ligeramente un peso en rules.yml."""
+    import yaml, os, time
+    path = "/app/policies/rules.yml"
+    with open(path, "r") as f:
+        data = yaml.safe_load(f)
+    weights = data.get("weights", {})
+    current = weights.get(key, 0.5)
+    new_val = max(0.0, min(1.0, round(current + delta, 3)))
+    weights[key] = new_val
+    data["weights"] = weights
+    with open(path, "w") as f:
+        yaml.safe_dump(data, f)
+    if round(new_val, 3) != round(current, 3):
+        print(f"📈 [policy_adapter] {key}: {current:.3f} → {new_val:.3f}")
+    return new_val

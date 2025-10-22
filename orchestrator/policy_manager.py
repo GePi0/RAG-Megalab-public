@@ -11,9 +11,7 @@ import os
 import json
 from state_producer import send_state_update
 
-ELASTIC_URL = os.getenv(
-    "ELASTIC_URL", "http://elasticsearch:9200/state_manager_v1/_search"
-)
+ELASTIC_URL = os.getenv("ELASTIC_URL", "http://elasticsearch:9200/state_manager_v1/_search")
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama-service:11434/api/generate")
 MODEL = os.getenv("OLLAMA_MODEL", "llama3.1:8b")
 
@@ -66,7 +64,7 @@ Devuelve texto plano.
     full_text = ""
 
     async with aiohttp.ClientSession() as session:
-        async with session.post(OLLAMA_URL, json=payload, timeout=120) as resp:
+        async with session.post(OLLAMA_URL, json=payload, timeout=360) as resp:
             async for raw_line in resp.content:
                 line = raw_line.decode("utf-8").strip()
                 if not line:
@@ -117,6 +115,12 @@ async def run_meta_reflection():
             print(f"⚠️ Error en feedback cognitivo: {type(fb_err).__name__}: {fb_err}")
 
         return reflection
+
+    except ValueError as e:
+        # --- caso típico sin eventos recientes ---
+        send_state_update("policy", "meta_reflection_warning", str(e))
+        print(f"⚠️ Meta‑reflexión pospuesta: {e}")
+        return ""
 
     except Exception as e:
         send_state_update("policy", "meta_reflection_error", str(e))

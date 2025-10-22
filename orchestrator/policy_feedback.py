@@ -12,6 +12,8 @@ import datetime
 import yaml
 import requests
 import numpy as np
+import json
+from kafka import KafkaConsumer
 
 ELASTIC_URL = os.getenv(
     "ELASTIC_URL", "http://elasticsearch:9200/state_manager_v1/_search"
@@ -128,3 +130,44 @@ def run_policy_feedback():
 
 if __name__ == "__main__":
     run_policy_feedback()
+
+# --- Integración Health Feedback (FASE 14‑B) ----------------
+
+def listen_health_feedback():
+    """Consume eventos health_status y ajusta pesos de resiliencia."""
+    topic = os.getenv("KAFKA_HEALTH_TOPIC", "health_status")
+    broker = os.getenv("KAFKA_BROKER", "redpanda:9092")
+    consumer = KafkaConsumer(
+        topic,
+        bootstrap_servers=[broker],
+        auto_offset_reset="latest",
+        group_id="policy_feedback_health",
+        value_deserializer=lambda v: json.loads(v.decode("utf-8")),
+    )
+
+    print("🧠 [feedback] escuchando health_status para adaptar rules.yml")
+    for msg in consumer:
+        data = msg.value
+        service, level, event = (
+            data.get("service"),
+            data.get("level"),
+            data.get("event"),
+        )
+        if not service:
+            continue
+
+        # --- regla sencilla de refuerzo ---
+        delta = 0
+        if event == "health_ok":
+            delta = +0.01
+        elif event == "health_fail":
+            delta = -0.02
+        elif event.startswith("auto_repair"):
+            delta = +0.02
+
+        if delta != 0:
+            from policy_adapter import modify_weight
+            old_val = modify_weight("resilience", delta)
+            # Solo imprime cuando hay cambio real (<1.0)
+            if old_val < 0.999:
+                print(f"🧩 [feedback] ajuste resiliencia {service}: Δ{delta:+.02f}")

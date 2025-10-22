@@ -12,6 +12,7 @@ Antes de generar o modificar código:
 
 from json_logger import log_event
 from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from datetime import datetime
 from llm_worker import generate_code_response
@@ -105,3 +106,7 @@ def act_on_task(request: ActRequest):
     send_state_update(task_id, "task_completed", f"Worker MCP completó la tarea en {target_file}")
 
     return ActResponse(task_id=task_id, result=result, context=context_out)
+
+@app.get("/health")
+def health_check():
+    return JSONResponse(content={"worker_mcp": "ok"}, status_code=200)

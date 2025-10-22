@@ -14,10 +14,18 @@ services:
       - LOG_PATH=/storage/logs/orchestrator/events.log
       - PYTHONUNBUFFERED=1
       - WORKER_TIMEOUT=60   
+      - DOCKER_SDK_ACTIVE=false       # activar true en QA
+      - DRY_RUN=true
+      - HEALTH_INTERVAL_SEC=60
+      - RETRY_LIMIT=3
+      - ELASTIC_URL=http://elasticsearch:9200/state_manager_v1/_search
+      - ELASTIC_INDEX_INCIDENTS=incident_events_v1
+      - KAFKA_HEALTH_TOPIC=health_status
     volumes:
       - ./storage/logs/orchestrator:/storage/logs/orchestrator
       - ./storage/chroma:/storage/chroma
       - ./storage/policies:/app/policies
+      - ./storage/projects:/workspace/projects
     depends_on:
       - context_service
       - worker_mcp
