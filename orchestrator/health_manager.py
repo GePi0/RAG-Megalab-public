@@ -50,7 +50,8 @@ async def monitor_services():
                 if result["ok"]:
                     consecutive_failures[name] = 0
                     log_incident(name, "INFO", "health_ok", f"Servicio {name} responde 200.")
-                    send_state_update("HEALTH", f"{name}_ok", "Servicio operativo")
+                    send_state_update("HEALTH", f"{name}_ok", "Servicio operativo",
+                                      extras={"status": "ok", "error_message": None, "recovered": True})
                     continue
 
                 # -------- FAIL
@@ -59,11 +60,24 @@ async def monitor_services():
                              f"Fallo detectado ({result.get('error','code')})",
                              attempt=consecutive_failures[name])
 
+                # enviar evento de fallo a Elastic + Kafka
+                send_state_update(
+                    "HEALTH",
+                    f"{name}_fail",
+                    f"Fallo detectado en {name}: {result.get('error', '')}",
+                    extras={
+                        "status": "fail",
+                        "error_message": result.get("error", ""),
+                        "recovered": False,
+                    },
+                )
+
                 if consecutive_failures[name] >= RETRY_LIMIT:
                     log_incident(name, "ERROR", "health_critical",
                                  f"Reintentos agotados. Reinicio de {name}...")
                     res = handle_restart(name)
-                    send_state_update("HEALTH", f"{name}_restart", json.dumps(res))
+                    send_state_update("HEALTH", f"{name}_restart", json.dumps(res),
+                                      extras={"status": "restarting", "error_message": None, "recovered": True})
                     consecutive_failures[name] = 0  # reset tras acción
 
         # ---- Integra meta‑reflexión si existe

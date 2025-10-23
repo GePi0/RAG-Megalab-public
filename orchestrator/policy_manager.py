@@ -114,6 +114,15 @@ async def run_meta_reflection():
         except Exception as fb_err:
             print(f"⚠️ Error en feedback cognitivo: {type(fb_err).__name__}: {fb_err}")
 
+        # ------------------------------------------------------------
+        # 🩺 Fase 14‑B – Healing Manager
+        # ------------------------------------------------------------
+        try:
+            from healing_manager import heal_from_reflection
+            heal_from_reflection(reflection)
+        except Exception as heal_err:
+            print(f"⚠️ HealingManager: {type(heal_err).__name__}: {heal_err}")
+
         return reflection
 
     except ValueError as e:

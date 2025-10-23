@@ -37,6 +37,8 @@ from health_manager import start_health_monitor
 # 🩺 Health System (FASE 14‑B)
 from policy_feedback import listen_health_feedback
 
+from healing_manager import listen_state_for_errors
+
 app = FastAPI(title="Orchestrator - RAG Megalab")
 chain = build_ollama_chain()
 
@@ -173,3 +175,11 @@ def startup_event():
     threading.Thread(target=start_health_monitor, daemon=True).start()
     threading.Thread(target=listen_health_feedback, daemon=True).start()
     print("🩺 Health Manager y Feedback Técnico iniciados (thread daemon).")
+
+@app.on_event("startup")
+def startup_event():
+    import threading
+    threading.Thread(target=start_health_monitor, daemon=True).start()
+    threading.Thread(target=listen_health_feedback, daemon=True).start()
+    threading.Thread(target=listen_state_for_errors, daemon=True).start()
+    print("🩺 Health Manager, Feedback Técnico y Healing Listener iniciados (thread daemon).")
