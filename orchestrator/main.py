@@ -28,11 +28,12 @@ from reasoning_supervisor import run_supervisor
 from policy_manager import run_meta_reflection
 from policy_adapter import load_adaptive_context
 
-# 🪄  Estrategias dinámicas (FASE 11)
+# 🪄  Estrategias dinámicas y file management (FASE 11)
 from strategy_manager import load_policy_weights, select_strategies, apply_strategy
-
-# 📁  Project Manager
 from project_manager.manifest import create_manifest, append_prompt, close_project
+from project_manager.snapshot_manager import create_snapshot
+from file_writer import write_worker_result_intelligent
+from pathlib import Path
 
 # 🩺 Health System (FASE 14‑A / 14‑B)
 from health_manager import start_health_monitor
@@ -133,6 +134,37 @@ def handle_prompt(body: PromptRequest):
         context = {"origin": "orchestrator", "stage": "delegation"}
         worker_resp = send_task_to_worker(task_id, body.prompt, context)
         send_state_update(task_id, "worker_dispatched", "Tarea enviada al Worker MCP")
+
+        # ----------------------------------------------------- 4.1️⃣  File I/O gestor
+        project_id = app.state.active_project_id
+        project_root = Path(f"/workspace/projects/{project_id}")
+
+        # 1️⃣ Snapshot previo
+        try:
+            before_snap = create_snapshot(project_id)
+            print(f"📦 Snapshot previo creado: {before_snap}")
+        except Exception as e:
+            print(f"⚠️ No se pudo crear snapshot previo: {e}")
+
+        # 2️⃣ Escritura inteligente del resultado del Worker
+        try:
+            file_path = write_worker_result_intelligent(project_id, body.prompt, worker_resp)
+            print(f"🗂️  Archivo generado y guardado en {file_path}")
+        except Exception as e:
+            print(f"⚠️ FileWriter falló: {e}")
+
+        # 3️⃣ Snapshot posterior
+        try:
+            after_snap = create_snapshot(project_id)
+            print(f"📦 Snapshot posterior creado: {after_snap}")
+        except Exception as e:
+            print(f"⚠️ No se pudo crear snapshot posterior: {e}")
+
+        # 4️⃣ Actualizar manifiesto
+        try:
+            append_prompt(project_id, body.prompt)
+        except Exception as e:
+            print(f"⚠️ Error actualizando manifest.yml: {e}")
 
         # ----------------------------------------------------- 5️⃣ Persistencia del contexto en Chroma
         combined_text = (
