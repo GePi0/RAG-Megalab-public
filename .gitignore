@@ -1,1 +1,36 @@
+# --- Private data ---
+.env
 storage/
+logs/
+projects/
+versions/
+chroma/
+redpanda/
+__pycache__/
+*.log
+*.pkl
+*.sqlite
+*.db
+*.pid
+*.sock
+*.zip
+
+# --- Python ---
+*.pyc
+*.pyo
+*.orig
+*.bak
+__pycache__/
+
+# --- Docker artifacts ---
+*.pid
+*.sock
+
+# --- Editor / IDE ---
+.vscode/
+.idea/
+.DS_Store
+
+# --- Output & temp ---
+*.tmp
+*.cache
